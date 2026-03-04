@@ -149,6 +149,10 @@ def render_sidebar():
         # Theme toggle
         st.session_state.dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
+        if st.button("🗑️ Clear Data Cache", use_container_width=True):
+            st.cache_data.clear()
+            st.toast("✅ Cache cleared! You can now fetch fresh data.")
+
         analysis_type = st.selectbox("Analysis Type", ANALYSIS_TYPES)
 
         market = st.selectbox(
