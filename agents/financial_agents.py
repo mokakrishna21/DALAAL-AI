@@ -66,9 +66,9 @@ def _create_market_data_agent() -> Agent:
         instructions=[
             "You are a market data specialist. Your job is to fetch accurate, real-time stock data.",
             "Always retrieve: current price, market cap, P/E, 52-week range, volume, and EPS.",
-            "Include analyst recommendations and price targets when available.",
-            "Format numbers clearly with commas and appropriate decimals.",
-            "If data is unavailable, state 'Data not available' rather than guessing.",
+            "Format numbers clearly with commas.",
+            "If data is unavailable, state 'Data not available'.",
+            "CRITICAL: Pass numerical parameters (like num_stories) as integers, NOT strings.",
         ],
         show_tool_calls=True,
         markdown=True,
@@ -82,8 +82,8 @@ def _create_web_search_agent() -> Agent:
         role="Search the web for latest financial news, market events, and analyst opinions",
         model=_get_model(),
         tools=[
-            GoogleSearch(fixed_language="english", fixed_max_results=5),
-            DuckDuckGo(fixed_max_results=5),
+            GoogleSearch(fixed_language="english", fixed_max_results=2),
+            DuckDuckGo(fixed_max_results=3),
         ],
         instructions=[
             "You are a financial research agent specializing in web intelligence.",
@@ -105,18 +105,17 @@ def _create_news_agent() -> Agent:
         role="Curate, filter, and analyze financial news for relevance and impact",
         model=_get_model(),
         tools=[
-            DuckDuckGo(fixed_max_results=8),
-            GoogleSearch(fixed_language="english", fixed_max_results=5),
+            DuckDuckGo(fixed_max_results=3),
+            GoogleSearch(fixed_language="english", fixed_max_results=2),
             YFinanceTools(company_news=True),
         ],
         instructions=[
             "You are a financial news curator and analyst.",
             "Find and organize the latest news about the specified stock or company.",
             "Categorize news by type: Earnings, Analysts, Regulatory, Product, Legal, Market Trends.",
-            "Rate each news item's potential market impact: High / Medium / Low.",
-            "Provide a brief analysis of how each major news item could affect the stock price.",
-            "Summarize the overall news sentiment: Bullish / Bearish / Mixed.",
-            "Include publication dates and sources for all news items.",
+            "Rate each news item's impact: High / Medium / Low.",
+            "Summarize news sentiment: Bullish / Bearish / Mixed.",
+            "CRITICAL: Pass numerical parameters (like num_stories) as integers, NOT strings.",
         ],
         show_tool_calls=True,
         markdown=True,
@@ -190,7 +189,7 @@ def _create_risk_assessment_agent() -> Agent:
         model=_get_model(),
         tools=[
             YFinanceTools(stock_price=True, stock_fundamentals=True, company_info=True),
-            DuckDuckGo(fixed_max_results=5),
+            DuckDuckGo(fixed_max_results=3),
         ],
         instructions=[
             "You are a risk management specialist.",
@@ -217,8 +216,8 @@ def _create_sentiment_analysis_agent() -> Agent:
         role="Sentiment specialist analyzing public opinion, social media trends, and market mood",
         model=_get_model(),
         tools=[
-            DuckDuckGo(fixed_max_results=8),
-            GoogleSearch(fixed_language="english", fixed_max_results=5),
+            DuckDuckGo(fixed_max_results=3),
+            GoogleSearch(fixed_language="english", fixed_max_results=2),
         ],
         instructions=[
             "You are a sentiment analysis specialist focused on financial markets.",
@@ -250,7 +249,7 @@ def _create_institutional_agent() -> Agent:
                 stock_fundamentals=True,
                 company_info=True,
             ),
-            DuckDuckGo(fixed_max_results=5),
+            DuckDuckGo(fixed_max_results=3),
         ],
         instructions=[
             "You are an institutional flow analyst tracking smart money.",
@@ -308,8 +307,8 @@ def _create_sector_industry_agent() -> Agent:
         role="Analyze sector trends, industry dynamics, and competitive landscape",
         model=_get_model(),
         tools=[
-            DuckDuckGo(fixed_max_results=8),
-            GoogleSearch(fixed_language="english", fixed_max_results=5),
+            DuckDuckGo(fixed_max_results=3),
+            GoogleSearch(fixed_language="english", fixed_max_results=2),
         ],
         instructions=[
             "You are a sector and industry analyst.",

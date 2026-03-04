@@ -299,10 +299,12 @@ def tab_overview(info, hist):
     if st.button("Generate AI Overview", key="ai_overview_btn"):
         if initialize_agents():
             with st.spinner("Fundamental Analysis Agent is analyzing..."):
+                container = st.container()
                 st.session_state.fundamental_agent.print_response(
                     f"Provide a brief fundamental overview of {info.get('shortName', '')} ({info.get('symbol', '')}). "
                     f"Focus on valuation (P/E, P/B), financial health, and growth.",
                     stream=True,
+                    streamlit=True,
                 )
 
 
@@ -344,12 +346,14 @@ def tab_charts(hist, symbol, dark_mode):
     if st.button("Generate AI Technical Analysis", key="ai_tech_btn"):
         if initialize_agents():
             with st.spinner("Technical Analysis Agent is analyzing charts..."):
+                container = st.container()
                 st.session_state.technical_agent.print_response(
                     f"Analyze {symbol} technically. RSI is {tech.get('rsi_14', 'N/A')}, "
                     f"MA cross signal is {tech.get('ma_cross', 'N/A')}, "
                     f"annualized volatility is {tech.get('volatility_pct', 0)}%. "
                     f"Identify patterns, support/resistance, and give a trade setup.",
                     stream=True,
+                    streamlit=True,
                 )
 
 
@@ -381,9 +385,11 @@ def tab_analysis(symbol, analysis_type, doc_store):
             agent = st.session_state.get(agent_key)
             if agent:
                 with st.spinner(f"{name} is analyzing {symbol}..."):
+                    container = st.container()
                     agent.print_response(
                         f"Provide a detailed {analysis_type.lower()} for {symbol}.",
                         stream=True,
+                        streamlit=True,
                     )
                 st.session_state.analysis_history.append({
                     "symbol": symbol,
@@ -400,25 +406,31 @@ def tab_analysis(symbol, analysis_type, doc_store):
         if st.button("⚠️ Risk Check", key="quick_risk", width="stretch"):
             if initialize_agents():
                 with st.spinner("Risk Assessment Agent working..."):
+                    container = st.container()
                     st.session_state.risk_agent.print_response(
                         f"Quick risk assessment for {symbol}: top 3 risks, risk score 1-10, near-term catalysts.",
                         stream=True,
+                        streamlit=True,
                     )
     with qc2:
         if st.button("🏭 Sector View", key="quick_sector", width="stretch"):
             if initialize_agents():
                 with st.spinner("Sector & Industry Agent working..."):
+                    container = st.container()
                     st.session_state.sector_agent.print_response(
                         f"Analyze the sector and competitive position of {symbol}.",
                         stream=True,
+                        streamlit=True,
                     )
     with qc3:
         if st.button("🔄 Peer Compare", key="quick_compare", width="stretch"):
             if initialize_agents():
                 with st.spinner("Stock Comparison Agent working..."):
+                    container = st.container()
                     st.session_state.comparison_agent.print_response(
                         f"Compare {symbol} against its top 3 sector peers on valuation, growth, and performance.",
                         stream=True,
+                        streamlit=True,
                     )
 
     # RAG Query Section
@@ -450,7 +462,8 @@ def tab_analysis(symbol, analysis_type, doc_store):
                 )
 
             with st.spinner(f"{agent_names.get(target_key, ('Agent',))[0]} is thinking..."):
-                target_agent.print_response(full_query, stream=True)
+                container = st.container()
+                target_agent.print_response(full_query, stream=True, streamlit=True)
 
 
 # ═══════════════════════════════ Tab: Sentiment ═══════════════════════════════
@@ -557,8 +570,9 @@ def tab_sentiment(symbol, company_name, dark_mode, doc_store):
                         f"{summary['neutral_pct']}% neutral. Average score: {summary['avg_score']:+.3f}. "
                         f"Interpret this sentiment data, identify risks, and predict potential price impact."
                     )
+                    container = st.container()
                     st.session_state.sentiment_agent.print_response(
-                        sentiment_summary, stream=True,
+                        sentiment_summary, stream=True, streamlit=True,
                     )
 
 
@@ -592,10 +606,12 @@ def tab_news(info, symbol):
     if st.button("🔍 Fetch AI-Curated News", key="ai_news_btn", width="stretch"):
         if initialize_agents():
             with st.spinner("News Curator Agent is finding and analyzing news..."):
+                container = st.container()
                 st.session_state.news_agent.print_response(
                     f"Find and analyze the latest news for {symbol} ({info.get('shortName', '')})."
                     f" Categorize by type, rate market impact, and summarize overall news sentiment.",
                     stream=True,
+                    streamlit=True,
                 )
 
 

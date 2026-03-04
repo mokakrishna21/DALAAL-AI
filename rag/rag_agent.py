@@ -28,7 +28,7 @@ class SentimentRetrieverTool(Toolkit):
         Returns:
             Formatted context string with relevant posts and their sentiment scores.
         """
-        results = self.doc_store.search(query, top_k=15)
+        results = self.doc_store.search(query, top_k=5)
         if not results:
             return "No relevant social media posts found for this query."
 
