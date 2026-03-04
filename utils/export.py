@@ -31,24 +31,12 @@ def export_csv(data: dict, symbol: str) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
 
 
-def _clean_text_for_pdf(text: str) -> str:
-    """Remove emojis and non-latin-1 characters that crash default FPDF fonts."""
-    if not isinstance(text, str):
-        return str(text)
-    return text.encode('latin-1', 'ignore').decode('latin-1')
-
-
-def _clean_dict_strings(d: dict) -> dict:
-    """Recursively clean all string values in a dictionary for PDF export."""
-    cleaned = {}
-    for k, v in d.items():
-        if isinstance(v, dict):
-            cleaned[k] = _clean_dict_strings(v)
-        elif isinstance(v, str):
-            cleaned[k] = _clean_text_for_pdf(v)
-        else:
-            cleaned[k] = v
-    return cleaned
+def _clean_text(text) -> str:
+    """Safely remove emojis and non-latin-1 characters to prevent FPDF UnicodeEncodeError."""
+    if text is None:
+        return ""
+    text_str = str(text)
+    return text_str.encode('latin-1', 'ignore').decode('latin-1')
 
 
 def export_pdf(data: dict, symbol: str) -> bytes:
@@ -59,19 +47,17 @@ def export_pdf(data: dict, symbol: str) -> bytes:
         st.warning("📦 `fpdf2` not installed. Run `pip install fpdf2` for PDF export.")
         return b""
 
-    # Clean text to prevent FPDF UnicodeEncodeError with emojis (e.g., 🔴)
-    data = _clean_dict_strings(data)
-    symbol = _clean_text_for_pdf(symbol)
-
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
+    symbol_clean = _clean_text(symbol)
+
     # Title
     pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 15, f"DALAAL AI Report: {symbol}", ln=True, align="C")
+    pdf.cell(0, 15, _clean_text(f"DALAAL AI Report: {symbol_clean}"), ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 8, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
+    pdf.cell(0, 8, _clean_text(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"), ln=True, align="C")
     pdf.ln(10)
 
     # Fundamentals
@@ -88,7 +74,7 @@ def export_pdf(data: dict, symbol: str) -> bytes:
         pdf.cell(0, 10, "Technical Indicators", ln=True)
         pdf.set_font("Helvetica", "", 11)
         for k, v in data["technicals"].items():
-            pdf.cell(0, 7, f"  {k}: {v}", ln=True)
+            pdf.cell(0, 7, _clean_text(f"  {k}: {v}"), ln=True)
         pdf.ln(5)
 
     # Sentiment
@@ -97,9 +83,9 @@ def export_pdf(data: dict, symbol: str) -> bytes:
         pdf.cell(0, 10, "Sentiment Analysis", ln=True)
         pdf.set_font("Helvetica", "", 11)
         s = data["sentiment_summary"]
-        pdf.cell(0, 7, f"  Total Posts Analyzed: {s.get('total', 0)}", ln=True)
-        pdf.cell(0, 7, f"  Positive: {s.get('positive_pct', 0)}%  |  Negative: {s.get('negative_pct', 0)}%  |  Neutral: {s.get('neutral_pct', 0)}%", ln=True)
-        pdf.cell(0, 7, f"  Average Score: {s.get('avg_score', 0):+.3f}  ({s.get('label', 'neutral')})", ln=True)
+        pdf.cell(0, 7, _clean_text(f"  Total Posts Analyzed: {s.get('total', 0)}"), ln=True)
+        pdf.cell(0, 7, _clean_text(f"  Positive: {s.get('positive_pct', 0)}%  |  Negative: {s.get('negative_pct', 0)}%  |  Neutral: {s.get('neutral_pct', 0)}%"), ln=True)
+        pdf.cell(0, 7, _clean_text(f"  Average Score: {s.get('avg_score', 0):+.3f}  ({s.get('label', 'neutral')})"), ln=True)
         pdf.ln(5)
 
     return pdf.output()
@@ -107,11 +93,11 @@ def export_pdf(data: dict, symbol: str) -> bytes:
 
 def _add_section(pdf, title, info, fields):
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, title, ln=True)
+    pdf.cell(0, 10, _clean_text(title), ln=True)
     pdf.set_font("Helvetica", "", 11)
     for label, key in fields:
         val = info.get(key, "N/A")
         if isinstance(val, (int, float)):
             val = f"{val:,.2f}" if isinstance(val, float) else f"{val:,}"
-        pdf.cell(0, 7, f"  {label}: {val}", ln=True)
+        pdf.cell(0, 7, _clean_text(f"  {label}: {val}"), ln=True)
     pdf.ln(5)
