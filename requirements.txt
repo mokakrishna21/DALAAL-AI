@@ -14,8 +14,7 @@ googlesearch-python
 pycountry
 # --- Sentiment Analysis (all open-source) ---
 vaderSentiment
-transformers
-torch
+requests
 praw
 snscrape
 ntscraper

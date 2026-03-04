@@ -72,72 +72,79 @@ def _vader_batch(texts: list[str]) -> list[float]:
         return [0.0] * len(texts)
 
 
-# ──────────────────────── FinBERT ────────────────────────
+# ──────────────────────── FinBERT (via HuggingFace Inference API) ────────────────────────
 
-@st.cache_resource(show_spinner=False)
-def _load_finbert():
-    """Load FinBERT model (ProsusAI/finbert) — open-source, Apache 2.0 license.
-    
-    Cached via st.cache_resource so the model is loaded only once per session.
-    """
+FINBERT_API_URL = "https://api-inference.huggingface.co/models/ProsusAI/finbert"
+
+
+def _get_hf_api_key() -> str:
+    """Get HuggingFace API key from Streamlit secrets or env."""
+    import os
     try:
-        from transformers import AutoTokenizer, AutoModelForSequenceClassification
-        import torch
-
-        model_name = "ProsusAI/finbert"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(model_name)
-        model.eval()
-        return tokenizer, model
-    except ImportError:
-        st.warning("📦 `transformers` and `torch` needed for FinBERT. Run `pip install transformers torch`.")
-        return None, None
-    except Exception as e:
-        st.warning(f"Could not load FinBERT: {e}")
-        return None, None
+        return st.secrets.get("HF_API_KEY", os.environ.get("HF_API_KEY", ""))
+    except Exception:
+        return os.environ.get("HF_API_KEY", "")
 
 
-def _finbert_batch(texts: list[str], batch_size: int = 16) -> list[dict]:
-    """Run FinBERT inference in batches.
-    
+def _finbert_batch(texts: list[str], batch_size: int = 10) -> list[dict]:
+    """Run FinBERT via HuggingFace Inference API (no local model needed).
+
+    Uses the free HF Inference API — runs on HuggingFace servers.
     Returns list of {score, label} dicts.
-    Labels: 'positive', 'negative', 'neutral'
     """
-    tokenizer, model = _load_finbert()
-    if tokenizer is None or model is None:
+    api_key = _get_hf_api_key()
+    if not api_key:
+        st.warning("🔑 HuggingFace API key not set. Add `HF_API_KEY` to secrets for FinBERT sentiment.")
         return [{"score": 0.0, "label": "neutral"}] * len(texts)
 
-    try:
-        import torch
+    import requests
+    import time
 
-        labels_map = {0: "positive", 1: "negative", 2: "neutral"}
-        results = []
+    headers = {"Authorization": f"Bearer {api_key}"}
+    results = []
 
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            # Truncate long texts to 512 tokens
-            inputs = tokenizer(
-                batch, padding=True, truncation=True,
-                max_length=512, return_tensors="pt",
-            )
+    for i in range(0, len(texts), batch_size):
+        batch = [t[:512] for t in texts[i : i + batch_size]]  # Truncate to ~512 chars
 
-            with torch.no_grad():
-                outputs = model(**inputs)
-                probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
+        for attempt in range(3):
+            try:
+                response = requests.post(
+                    FINBERT_API_URL,
+                    headers=headers,
+                    json={"inputs": batch, "options": {"wait_for_model": True}},
+                    timeout=30,
+                )
 
-            for j in range(len(batch)):
-                scores = probs[j].tolist()
-                max_idx = scores.index(max(scores))
-                results.append({
-                    "score": scores[max_idx],
-                    "label": labels_map[max_idx],
-                })
+                if response.status_code == 200:
+                    data = response.json()
+                    for item in data:
+                        if isinstance(item, list) and item:
+                            # HF returns sorted list of {label, score} per input
+                            best = item[0]
+                            results.append({
+                                "score": best.get("score", 0.0),
+                                "label": best.get("label", "neutral").lower(),
+                            })
+                        else:
+                            results.append({"score": 0.0, "label": "neutral"})
+                    break  # Success — exit retry loop
 
-        return results
+                elif response.status_code == 503:
+                    # Model loading — wait and retry
+                    time.sleep(3)
+                    continue
+                else:
+                    st.warning(f"FinBERT API error {response.status_code}: {response.text[:100]}")
+                    results.extend([{"score": 0.0, "label": "neutral"}] * len(batch))
+                    break
 
-    except Exception as e:
-        st.warning(f"FinBERT inference error: {e}")
-        return [{"score": 0.0, "label": "neutral"}] * len(texts)
+            except Exception as e:
+                if attempt == 2:
+                    st.warning(f"FinBERT API failed after 3 retries: {e}")
+                    results.extend([{"score": 0.0, "label": "neutral"}] * len(batch))
+                time.sleep(2)
+
+    return results
 
 
 def get_sentiment_summary(posts: list[dict]) -> dict:
