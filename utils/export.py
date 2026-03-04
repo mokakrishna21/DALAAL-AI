@@ -31,6 +31,26 @@ def export_csv(data: dict, symbol: str) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
 
 
+def _clean_text_for_pdf(text: str) -> str:
+    """Remove emojis and non-latin-1 characters that crash default FPDF fonts."""
+    if not isinstance(text, str):
+        return str(text)
+    return text.encode('latin-1', 'ignore').decode('latin-1')
+
+
+def _clean_dict_strings(d: dict) -> dict:
+    """Recursively clean all string values in a dictionary for PDF export."""
+    cleaned = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            cleaned[k] = _clean_dict_strings(v)
+        elif isinstance(v, str):
+            cleaned[k] = _clean_text_for_pdf(v)
+        else:
+            cleaned[k] = v
+    return cleaned
+
+
 def export_pdf(data: dict, symbol: str) -> bytes:
     """Export analysis as a PDF report using fpdf2 (open-source)."""
     try:
@@ -38,6 +58,10 @@ def export_pdf(data: dict, symbol: str) -> bytes:
     except ImportError:
         st.warning("📦 `fpdf2` not installed. Run `pip install fpdf2` for PDF export.")
         return b""
+
+    # Clean text to prevent FPDF UnicodeEncodeError with emojis (e.g., 🔴)
+    data = _clean_dict_strings(data)
+    symbol = _clean_text_for_pdf(symbol)
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
