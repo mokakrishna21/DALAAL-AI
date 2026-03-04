@@ -1,0 +1,28 @@
+phidata
+python-dotenv
+yfinance
+packaging
+duckduckgo-search
+fastapi
+uvicorn
+groq
+openai
+streamlit
+pandas
+plotly
+googlesearch-python
+pycountry
+# --- Sentiment Analysis (all open-source) ---
+vaderSentiment
+transformers
+torch
+praw
+snscrape
+ntscraper
+# --- RAG / Embeddings (open-source) ---
+sentence-transformers
+numpy
+# --- Utilities ---
+thefuzz[speedup]
+fpdf2
+wordcloud
