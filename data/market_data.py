@@ -60,34 +60,6 @@ def _validate_ticker(symbol: str) -> bool:
         return False
 
 
-def _get_yf_session():
-    """Create a requests session with a custom User-Agent to bypass yfinance 429 errors."""
-    import requests
-    from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
-    import random
-
-    session = requests.Session()
-    retry = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["GET", "POST"]
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-
-    user_agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ]
-    session.headers.update({"User-Agent": random.choice(user_agents)})
-    return session
-
-
 @st.cache_data(ttl=300, show_spinner=False)
 def get_stock_data(symbol: str, period: str = "1y"):
     """Fetch stock info + OHLCV history with retry logic.
@@ -95,11 +67,11 @@ def get_stock_data(symbol: str, period: str = "1y"):
     Returns (info_dict, history_dataframe) or (None, None) on failure.
     """
     max_retries = 3
-    session = _get_yf_session()
 
     for attempt in range(max_retries):
         try:
-            stock = yf.Ticker(symbol, session=session)
+            # Note: Do not inject custom session; yfinance requires its own curl_cffi session
+            stock = yf.Ticker(symbol)
             info = stock.info
             if not info:
                 raise ValueError("Empty info response")
@@ -122,7 +94,7 @@ def get_stock_data(symbol: str, period: str = "1y"):
 def get_options_chain(symbol: str):
     """Fetch options chain for the nearest expiration date."""
     try:
-        stock = yf.Ticker(symbol, session=_get_yf_session())
+        stock = yf.Ticker(symbol)
         expirations = stock.options
         if not expirations:
             return None, None, []
@@ -137,7 +109,7 @@ def get_options_chain(symbol: str):
 def get_institutional_holders(symbol: str):
     """Get institutional + major holders data."""
     try:
-        stock = yf.Ticker(symbol, session=_get_yf_session())
+        stock = yf.Ticker(symbol)
         institutional = stock.institutional_holders
         major = stock.major_holders
         return institutional, major
