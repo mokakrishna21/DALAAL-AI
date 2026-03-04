@@ -6,7 +6,7 @@ from phi.agent.agent import Agent
 from phi.model.groq import Groq
 from phi.tools import Toolkit
 
-from config import get_groq_api_key, LLM_MODEL_ID
+import config
 from rag.document_store import DocumentStore
 
 
@@ -48,14 +48,15 @@ class SentimentRetrieverTool(Toolkit):
         header = f"Found {len(results)} relevant posts (out of {self.doc_store.size} total):\n\n"
         return header + "\n".join(context_parts)
 
+from typing import Optional
 
-def create_rag_agent(doc_store: DocumentStore) -> Agent | None:
+def create_rag_agent(doc_store: DocumentStore) -> Optional[Agent]:
     """Create a RAG-enabled agent that can answer questions about stock sentiment.
 
     Uses the open-source LLaMA 3.3 70B model via Groq for generation,
     and retrieves context from the in-memory document store.
     """
-    api_key = get_groq_api_key()
+    api_key = config.get_groq_api_key()
     if not api_key:
         return None
 
@@ -65,7 +66,7 @@ def create_rag_agent(doc_store: DocumentStore) -> Agent | None:
         agent = Agent(
             name="Sentiment RAG Agent",
             role="Answer questions about public sentiment and social media discussions around stocks",
-            model=Groq(id=LLM_MODEL_ID, api_key=api_key),
+            model=Groq(id=config.LLM_MODEL_ID, api_key=api_key),
             tools=[retriever_tool],
             instructions=[
                 "You are a financial sentiment analyst. Use the sentiment_retriever tool to find relevant social media posts.",

@@ -31,7 +31,7 @@ def create_sentiment_gauge(avg_score: float, dark_mode: bool = False) -> go.Figu
         },
     ))
     template = "plotly_dark" if dark_mode else "plotly_white"
-    fig.update_layout(height=280, template=template, margin=dict(l=30, r=30, t=60, b=30))
+    fig.update_layout(template=template, margin=dict(l=30, r=30, t=60, b=30))
     return fig
 
 
@@ -49,7 +49,7 @@ def create_sentiment_pie(summary: dict, dark_mode: bool = False) -> go.Figure:
     ))
     template = "plotly_dark" if dark_mode else "plotly_white"
     fig.update_layout(
-        title="Sentiment Distribution", height=350,
+        title="Sentiment Distribution",
         template=template, margin=dict(l=30, r=30, t=60, b=30),
         showlegend=False,
     )
@@ -97,7 +97,7 @@ def create_sentiment_timeline(posts: list[dict], dark_mode: bool = False) -> go.
     fig.update_layout(
         title="Sentiment Over Time",
         yaxis_title="Sentiment Score", yaxis_range=[-1.1, 1.1],
-        template=template, height=350,
+        template=template,
         margin=dict(l=50, r=20, t=60, b=40),
     )
     return fig
@@ -126,7 +126,7 @@ def create_source_comparison(posts: list[dict], dark_mode: bool = False) -> go.F
     fig.update_layout(
         title="Sentiment by Source",
         yaxis_title="Avg Sentiment", yaxis_range=[-1, 1],
-        template=template, height=300,
+        template=template,
         margin=dict(l=50, r=20, t=60, b=40),
     )
     return fig

@@ -1,5 +1,5 @@
 # agents/financial_agents.py — Full Agentic AI Roster for DALAAL AI
-# 10+ specialized agents, all powered by open-source LLaMA 3.3 via Groq
+# 10+ specialized agents, all powered by open-source LLaMA 3.1 via Groq
 #
 # Agent Architecture:
 #  ┌─────────────────────────────────────────────────────────────┐
@@ -27,18 +27,20 @@
 #  └─────────────────────────────────────────────────────────────┘
 
 import streamlit as st
+import importlib
+import config
 from phi.agent.agent import Agent
 from phi.model.groq import Groq
 from phi.tools.yfinance import YFinanceTools
 from phi.tools.duckduckgo import DuckDuckGo
 from phi.tools.googlesearch import GoogleSearch
 
-from config import get_groq_api_key, LLM_MODEL_ID
+import config
 
 
 def _get_model():
-    """Get a fresh Groq model instance (open-source LLaMA 3.3 70B)."""
-    return Groq(id=LLM_MODEL_ID, api_key=get_groq_api_key())
+    """Get a fresh Groq model instance."""
+    return Groq(id=config.LLM_MODEL_ID, api_key=config.get_groq_api_key())
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -428,10 +430,37 @@ def initialize_agents() -> bool:
         ├── Sector & Industry Agent
         └── Report Generator Agent (has access to all above)
     """
-    if st.session_state.get("agents_initialized"):
-        return True
+    # Force reload config to ensure we have the latest model ID
+    importlib.reload(config)
+    
+    current_model = config.LLM_MODEL_ID
+    stored_model = st.session_state.get("model_id")
+    
+    # Log for debugging (visible in terminal logs)
+    print(f"DEBUG: initialize_agents called. Stored model: {stored_model}, Config model: {current_model}")
 
-    api_key = get_groq_api_key()
+    if st.session_state.get("agents_initialized") and stored_model == current_model:
+        # Extra safety check: peek at one agent to ensure it's not a zombie with the wrong ID
+        test_agent = st.session_state.get("multi_ai_agent")
+        if test_agent and hasattr(test_agent, "model") and hasattr(test_agent.model, "id"):
+            if test_agent.model.id == current_model:
+                return True
+            else:
+                print(f"DEBUG: Agent model mismatch! Stored: {test_agent.model.id}, Config: {current_model}")
+        else:
+            return True # Assume OK if we can't check, the logic below will fix it anyway if called
+
+    # If we are here, we are re-initializing. Clear old agents explicitly.
+    agent_keys = [
+        "market_data_agent", "web_agent", "news_agent", "technical_agent", 
+        "fundamental_agent", "risk_agent", "sentiment_agent", "institutional_agent",
+        "comparison_agent", "sector_agent", "report_agent", "multi_ai_agent"
+    ]
+    for k in agent_keys:
+        if k in st.session_state:
+            del st.session_state[k]
+
+    api_key = config.get_groq_api_key()
     if not api_key:
         st.error("⚠️ GROQ_API_KEY not configured. Add it to `.streamlit/secrets.toml` or environment variables.")
         return False
@@ -480,8 +509,9 @@ def initialize_agents() -> bool:
         st.session_state.sector_agent = sector_agent
         st.session_state.report_agent = report_agent
         st.session_state.multi_ai_agent = master
-
+        st.session_state.model_id = current_model
         st.session_state.agents_initialized = True
+        print(f"DEBUG: Agents initialized successfully with model: {current_model}")
         return True
 
     except Exception as e:

@@ -4,6 +4,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import importlib
+import config
 
 from config import APP_TITLE, APP_ICON, PERIOD_MAP
 from data.market_data import (
@@ -145,11 +147,53 @@ def init_session_state():
 def render_sidebar():
     with st.sidebar:
         st.markdown("## ⚙️ Settings")
+        importlib.reload(config)
+        print(f"DEBUG: Sidebar render. config.LLM_MODEL_ID = {config.LLM_MODEL_ID}")
 
         # Theme toggle
         st.session_state.dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
-        if st.button("🗑️ Clear Data Cache", use_container_width=True):
+        st.markdown("---")
+        # Global Model Exorcism (Targeted Wipe of Decommissioned Models)
+        is_legacy = False
+        legacy_models = ["llama-3.1-70b-versatile"]
+        
+        # 1. Check stored model_id
+        if st.session_state.get("model_id") in legacy_models:
+            is_legacy = True
+            
+        # 2. Direct inspection of stored agents (if initialized)
+        if not is_legacy and st.session_state.get("agents_initialized"):
+            # We check the most important agents
+            for agent_key in ["multi_ai_agent", "fundamental_agent"]:
+                if agent_key in st.session_state:
+                    try:
+                        agent_obj = st.session_state[agent_key]
+                        if hasattr(agent_obj, "model") and hasattr(agent_obj.model, "id"):
+                            model_id = str(agent_obj.model.id).lower()
+                            if any(legacy in model_id for legacy in legacy_models):
+                                is_legacy = True
+                                break
+                    except Exception:
+                        pass
+        
+        if is_legacy:
+            st.session_state.agents_initialized = False
+            # Clear them explicitly just in case
+            for k in ["multi_ai_agent", "fundamental_agent", "model_id"]:
+                if k in st.session_state:
+                    del st.session_state[k]
+            st.warning("⚠️ Decommissioned model detected. Resetting agents...")
+            st.rerun()
+
+        if st.button("🔄 Force Refresh Agents"):
+            st.session_state.agents_initialized = False
+            if "model_id" in st.session_state:
+                del st.session_state["model_id"]
+            st.success("Agents reset. They will re-initialize on next use.")
+            st.rerun()
+
+        if st.button("🗑️ Clear Data Cache", width="stretch"):
             st.cache_data.clear()
             st.toast("✅ Cache cleared! You can now fetch fresh data.")
 
@@ -164,7 +208,7 @@ def render_sidebar():
         # Watchlist
         st.markdown("### 📋 Watchlist")
         wl_input = st.text_input("Add stock", placeholder="e.g. NVIDIA, TCS")
-        if st.button("➕ Add", use_container_width=True):
+        if st.button("➕ Add", width="stretch"):
             sym = get_symbol_from_name(wl_input)
             if sym:
                 st.session_state.watchlist.add(sym)
@@ -247,7 +291,7 @@ def tab_overview(info, hist):
     inst, major = get_institutional_holders(info.get("symbol", ""))
     if inst is not None and not inst.empty:
         st.markdown("### 🏛️ Top Institutional Holders")
-        st.dataframe(inst.head(10), use_container_width=True, hide_index=True)
+        st.dataframe(inst.head(10), width="stretch", hide_index=True)
 
     # AI-powered fundamental overview
     st.markdown("---")
@@ -266,19 +310,19 @@ def tab_overview(info, hist):
 
 def tab_charts(hist, symbol, dark_mode):
     st.markdown("### 📈 Price Action")
-    st.plotly_chart(create_price_chart(hist, symbol, dark_mode), use_container_width=True)
+    st.plotly_chart(create_price_chart(hist, symbol, dark_mode))
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(create_volume_chart(hist, dark_mode), use_container_width=True)
+        st.plotly_chart(create_volume_chart(hist, dark_mode))
     with c2:
-        st.plotly_chart(create_rsi_chart(hist, dark_mode), use_container_width=True)
+        st.plotly_chart(create_rsi_chart(hist, dark_mode))
 
     c3, c4 = st.columns(2)
     with c3:
-        st.plotly_chart(create_macd_chart(hist, dark_mode), use_container_width=True)
+        st.plotly_chart(create_macd_chart(hist, dark_mode))
     with c4:
-        st.plotly_chart(create_bollinger_chart(hist, dark_mode), use_container_width=True)
+        st.plotly_chart(create_bollinger_chart(hist, dark_mode))
 
     # Summary metrics
     st.markdown("### 🔢 Technical Summary")
@@ -332,7 +376,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
     name, desc = agent_names.get(agent_key, ("AI Agent", ""))
     st.info(f"🤖 **{name}** — {desc}")
 
-    if st.button("🚀 Run AI Analysis", type="primary", key="run_ai_btn", use_container_width=True):
+    if st.button("🚀 Run AI Analysis", type="primary", key="run_ai_btn", width="stretch"):
         if initialize_agents():
             agent = st.session_state.get(agent_key)
             if agent:
@@ -353,7 +397,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
     st.markdown("### ⚡ Quick Agent Actions")
     qc1, qc2, qc3 = st.columns(3)
     with qc1:
-        if st.button("⚠️ Risk Check", key="quick_risk", use_container_width=True):
+        if st.button("⚠️ Risk Check", key="quick_risk", width="stretch"):
             if initialize_agents():
                 with st.spinner("Risk Assessment Agent working..."):
                     st.session_state.risk_agent.print_response(
@@ -361,7 +405,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
                         stream=True,
                     )
     with qc2:
-        if st.button("🏭 Sector View", key="quick_sector", use_container_width=True):
+        if st.button("🏭 Sector View", key="quick_sector", width="stretch"):
             if initialize_agents():
                 with st.spinner("Sector & Industry Agent working..."):
                     st.session_state.sector_agent.print_response(
@@ -369,7 +413,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
                         stream=True,
                     )
     with qc3:
-        if st.button("🔄 Peer Compare", key="quick_compare", use_container_width=True):
+        if st.button("🔄 Peer Compare", key="quick_compare", width="stretch"):
             if initialize_agents():
                 with st.spinner("Stock Comparison Agent working..."):
                     st.session_state.comparison_agent.print_response(
@@ -417,7 +461,7 @@ def tab_sentiment(symbol, company_name, dark_mode, doc_store):
 
     search_terms = f"{symbol} {company_name}".strip()
 
-    if st.button("🔄 Fetch & Analyze Social Posts", type="primary", use_container_width=True):
+    if st.button("🔄 Fetch & Analyze Social Posts", type="primary", width="stretch"):
         # Scrape
         with st.spinner("📡 Scraping Reddit & Twitter/X..."):
             reddit_posts = scrape_reddit(search_terms)
@@ -463,15 +507,15 @@ def tab_sentiment(symbol, company_name, dark_mode, doc_store):
         # Charts
         c1, c2 = st.columns(2)
         with c1:
-            st.plotly_chart(create_sentiment_gauge(summary["avg_score"], dark_mode), use_container_width=True)
+            st.plotly_chart(create_sentiment_gauge(summary["avg_score"], dark_mode))
         with c2:
-            st.plotly_chart(create_sentiment_pie(summary, dark_mode), use_container_width=True)
+            st.plotly_chart(create_sentiment_pie(summary, dark_mode))
 
         c3, c4 = st.columns(2)
         with c3:
-            st.plotly_chart(create_sentiment_timeline(analyzed, dark_mode), use_container_width=True)
+            st.plotly_chart(create_sentiment_timeline(analyzed, dark_mode))
         with c4:
-            st.plotly_chart(create_source_comparison(analyzed, dark_mode), use_container_width=True)
+            st.plotly_chart(create_source_comparison(analyzed, dark_mode))
 
         # Word cloud (text-based fallback if wordcloud lib not available)
         st.markdown("### ☁️ Key Discussion Topics")
@@ -545,7 +589,7 @@ def tab_news(info, symbol):
     # AI-powered news curation
     st.markdown("---")
     st.markdown("### 🤖 AI-Curated News & Analysis")
-    if st.button("🔍 Fetch AI-Curated News", key="ai_news_btn", use_container_width=True):
+    if st.button("🔍 Fetch AI-Curated News", key="ai_news_btn", width="stretch"):
         if initialize_agents():
             with st.spinner("News Curator Agent is finding and analyzing news..."):
                 st.session_state.news_agent.print_response(
@@ -580,7 +624,7 @@ def main():
         date_range = st.selectbox("Time Range", list(PERIOD_MAP.keys()), index=3)
         period = PERIOD_MAP[date_range]
 
-    if st.button("🚀 Analyze", type="primary", use_container_width=True):
+    if st.button("🚀 Analyze", type="primary", width="stretch"):
         if not stock_input:
             st.error("Please enter a stock name or symbol.")
             return
@@ -664,6 +708,8 @@ def main():
     with exp_cols[1]:
         pdf_bytes = export_pdf(export_data, symbol)
         if pdf_bytes:
+            # Explicitly cast to bytes to ensure Streamlit accepts it
+            pdf_bytes = bytes(pdf_bytes)
             st.download_button("📥 Export PDF", pdf_bytes, f"{symbol}_report.pdf", "application/pdf")
 
     # Analysis History
@@ -672,7 +718,7 @@ def main():
         st.markdown("### 📜 Analysis History")
         history_df = pd.DataFrame(st.session_state.analysis_history)
         history_df["timestamp"] = history_df["timestamp"].dt.strftime("%Y-%m-%d %H:%M")
-        st.dataframe(history_df, use_container_width=True, hide_index=True)
+        st.dataframe(history_df, width="stretch", hide_index=True)
 
 
 if __name__ == "__main__":

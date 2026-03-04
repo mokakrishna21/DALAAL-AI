@@ -88,7 +88,7 @@ def export_pdf(data: dict, symbol: str) -> bytes:
         pdf.cell(0, 7, _clean_text(f"  Average Score: {s.get('avg_score', 0):+.3f}  ({s.get('label', 'neutral')})"), ln=True)
         pdf.ln(5)
 
-    return pdf.output()
+    return bytes(pdf.output())
 
 
 def _add_section(pdf, title, info, fields):

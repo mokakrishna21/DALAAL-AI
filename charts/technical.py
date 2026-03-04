@@ -35,7 +35,7 @@ def create_price_chart(hist: pd.DataFrame, symbol: str, dark_mode: bool = False)
     fig.update_layout(
         title=f"{symbol} — Price Action",
         yaxis_title="Price", template=_get_template(dark_mode),
-        xaxis_rangeslider_visible=False, height=550,
+        xaxis_rangeslider_visible=False,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(l=50, r=20, t=60, b=40),
     )
@@ -63,7 +63,7 @@ def create_volume_chart(hist: pd.DataFrame, dark_mode: bool = False) -> go.Figur
 
     fig.update_layout(
         title="Trading Volume", yaxis_title="Volume",
-        template=_get_template(dark_mode), height=300,
+        template=_get_template(dark_mode),
         margin=dict(l=50, r=20, t=50, b=40),
     )
     return fig
@@ -90,7 +90,7 @@ def create_rsi_chart(hist: pd.DataFrame, dark_mode: bool = False) -> go.Figure:
     fig.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Oversold")
     fig.update_layout(
         title="RSI (14)", yaxis_title="RSI", yaxis_range=[0, 100],
-        template=_get_template(dark_mode), height=250,
+        template=_get_template(dark_mode),
         margin=dict(l=50, r=20, t=50, b=40),
     )
     return fig
@@ -122,7 +122,7 @@ def create_macd_chart(hist: pd.DataFrame, dark_mode: bool = False) -> go.Figure:
     ))
     fig.update_layout(
         title="MACD (12, 26, 9)", yaxis_title="MACD",
-        template=_get_template(dark_mode), height=300,
+        template=_get_template(dark_mode),
         margin=dict(l=50, r=20, t=50, b=40),
     )
     return fig
@@ -156,7 +156,7 @@ def create_bollinger_chart(hist: pd.DataFrame, dark_mode: bool = False) -> go.Fi
     ))
     fig.update_layout(
         title="Bollinger Bands (20, 2)", yaxis_title="Price",
-        template=_get_template(dark_mode), height=400,
+        template=_get_template(dark_mode),
         margin=dict(l=50, r=20, t=50, b=40),
     )
     return fig

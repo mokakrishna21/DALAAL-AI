@@ -25,15 +25,13 @@ def _load_embedding_model():
 
 
 class DocumentStore:
-    """Simple in-memory document store with vector search.
+    """In-memory vector database using sentence-transformers."""
 
-    Stores documents as {text, source, timestamp, sentiment_score, metadata}
-    and allows semantic retrieval using cosine similarity.
-    """
-
-    def __init__(self):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        self.model_name = model_name
+        self.encoder = None
         self.documents: list[dict] = []
-        self.embeddings: np.ndarray | None = None
+        self.embeddings: Optional[np.ndarray] = None
         self._model = None
 
     def _get_model(self):

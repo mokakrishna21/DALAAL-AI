@@ -30,7 +30,7 @@ def get_reddit_credentials():
 
 # ──────────────────────────── LLM Config ────────────────────────────
 # Using open-source LLaMA 3 via Groq (free tier)
-LLM_MODEL_ID = "llama-3.3-70b-versatile"
+LLM_MODEL_ID = "llama-3.1-8b-instant"
 
 # ──────────────────────────── Sentiment Models ────────────────────────────
 # All open-source HuggingFace models
