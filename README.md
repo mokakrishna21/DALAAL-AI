@@ -24,7 +24,7 @@ A high-performance dashboard streaming data from US and Indian markets (NYSE/NAS
 
 ### 📈 Interactive Technical Analysis
 Advanced charting using Plotly. Features include Candlesticks, Volume bars, RSI, MACD, and Bollinger Bands—plus an AI Technical Agent that interprets chart patterns in real-time.
-![Interactive Charts](assets/charts.png)
+![Interactive Charts](assets/charts.webp)
 
 ### 🤖 Multi-Agent AI Analysis Swarm
 A sophisticated **Swarm Intelligence architecture** using LLaMA 3.1 8B via Groq. A deterministic sequential workflow coordinates specialized AI agents (Technical, Fundamental, Risk, and Report Generators) to synthesize a comprehensive, multi-dimensional investment thesis.
@@ -32,11 +32,11 @@ A sophisticated **Swarm Intelligence architecture** using LLaMA 3.1 8B via Groq.
 
 ### 🧠 Social Sentiment Intelligence
 Powered by **FinBERT** and **VADER**, Dalaal AI scrapes Reddit and social sentiment to gauge retail vs. institutional mood, visualizing sentiment distributions instantly.
-![Sentiment Analysis](assets/sentiment.png)
+![Sentiment Analysis](assets/sentiment.webp)
 
 ### � Agentic News Curation
 A built-in news engine that fetches real-time articles via DuckDuckGo, categorizes them, and assigns AI-driven impact ratings (Bullish/Bearish/Neutral).
-![AI Curated News](assets/news.png)
+![AI Curated News](assets/news.webp)
 
 ---
 
