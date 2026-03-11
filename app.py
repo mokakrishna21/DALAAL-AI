@@ -43,10 +43,8 @@ st.set_page_config(
 
 # ═══════════════════════════════ Custom CSS ═══════════════════════════════
 
-def inject_css(dark_mode: bool = False):
-    bg = "#0e1117" if dark_mode else "#ffffff"
-    card_bg = "#1a1d23" if dark_mode else "#f8f9fa"
-    text_color = "#e0e0e0" if dark_mode else "#333333"
+def inject_css():
+    card_bg = "#f8f9fa"
     accent = "#7c4dff"
     accent2 = "#00e5ff"
 
@@ -85,7 +83,7 @@ def inject_css(dark_mode: bool = False):
         margin: 0.4rem 0;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         transition: transform 0.2s, box-shadow 0.2s;
-        border: 1px solid {'#2a2d35' if dark_mode else '#e8e8e8'};
+        border: 1px solid #e8e8e8;
     }}
     .metric-card:hover {{
         transform: translateY(-3px);
@@ -134,7 +132,6 @@ def init_session_state():
         "watchlist": set(),
         "analysis_history": [],
         "last_refresh": None,
-        "dark_mode": False,
         "doc_store": DocumentStore(),
     }
     for k, v in defaults.items():
@@ -148,10 +145,6 @@ def render_sidebar():
     with st.sidebar:
         st.markdown("## ⚙️ Settings")
         importlib.reload(config)
-        print(f"DEBUG: Sidebar render. config.LLM_MODEL_ID = {config.LLM_MODEL_ID}")
-
-        # Theme toggle
-        st.session_state.dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
         st.markdown("---")
         # Global Model Exorcism (Targeted Wipe of Decommissioned Models)
@@ -300,31 +293,35 @@ def tab_overview(info, hist):
         if initialize_agents():
             with st.spinner("Fundamental Analysis Agent is analyzing..."):
                 container = st.container()
-                st.session_state.fundamental_agent.print_response(
-                    f"Provide a brief fundamental overview of {info.get('shortName', '')} ({info.get('symbol', '')}). "
-                    f"Focus on valuation (P/E, P/B), financial health, and growth.",
-                    stream=True,
-                    streamlit=True,
-                )
+                try:
+                    response = st.session_state.fundamental_agent.run(
+                        f"Provide a brief fundamental overview of {info.get('shortName', '')} ({info.get('symbol', '')}). "
+                        f"Focus on valuation (P/E, P/B), financial health, and growth.",
+                        stream=False,
+                    )
+                    if response and response.content:
+                        container.markdown(response.content)
+                except Exception as e:
+                    st.error(f"⚠️ AI analysis failed: {e}")
 
 
 # ═══════════════════════════════ Tab: Charts ═══════════════════════════════
 
-def tab_charts(hist, symbol, dark_mode):
+def tab_charts(hist, symbol):
     st.markdown("### 📈 Price Action")
-    st.plotly_chart(create_price_chart(hist, symbol, dark_mode))
+    st.plotly_chart(create_price_chart(hist, symbol, False))
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(create_volume_chart(hist, dark_mode))
+        st.plotly_chart(create_volume_chart(hist, False))
     with c2:
-        st.plotly_chart(create_rsi_chart(hist, dark_mode))
+        st.plotly_chart(create_rsi_chart(hist, False))
 
     c3, c4 = st.columns(2)
     with c3:
-        st.plotly_chart(create_macd_chart(hist, dark_mode))
+        st.plotly_chart(create_macd_chart(hist, False))
     with c4:
-        st.plotly_chart(create_bollinger_chart(hist, dark_mode))
+        st.plotly_chart(create_bollinger_chart(hist, False))
 
     # Summary metrics
     st.markdown("### 🔢 Technical Summary")
@@ -347,14 +344,18 @@ def tab_charts(hist, symbol, dark_mode):
         if initialize_agents():
             with st.spinner("Technical Analysis Agent is analyzing charts..."):
                 container = st.container()
-                st.session_state.technical_agent.print_response(
-                    f"Analyze {symbol} technically. RSI is {tech.get('rsi_14', 'N/A')}, "
-                    f"MA cross signal is {tech.get('ma_cross', 'N/A')}, "
-                    f"annualized volatility is {tech.get('volatility_pct', 0)}%. "
-                    f"Identify patterns, support/resistance, and give a trade setup.",
-                    stream=True,
-                    streamlit=True,
-                )
+                try:
+                    response = st.session_state.technical_agent.run(
+                        f"Analyze {symbol} technically. RSI is {tech.get('rsi_14', 'N/A')}, "
+                        f"MA cross signal is {tech.get('ma_cross', 'N/A')}, "
+                        f"annualized volatility is {tech.get('volatility_pct', 0)}%. "
+                        f"Identify patterns, support/resistance, and give a trade setup.",
+                        stream=False,
+                    )
+                    if response and response.content:
+                        container.markdown(response.content)
+                except Exception as e:
+                    st.error(f"⚠️ AI analysis failed: {e}")
 
 
 # ═══════════════════════════════ Tab: AI Analysis ═══════════════════════════════
@@ -380,59 +381,119 @@ def tab_analysis(symbol, analysis_type, doc_store):
     name, desc = agent_names.get(agent_key, ("AI Agent", ""))
     st.info(f"🤖 **{name}** — {desc}")
 
+    # Display previously run analysis to survive Streamlit reruns
+    if "current_analysis_output" in st.session_state and st.session_state.current_analysis_symbol == symbol:
+        with st.container(border=True):
+            st.markdown(st.session_state.current_analysis_output)
+
     if st.button("🚀 Run AI Analysis", type="primary", key="run_ai_btn", width="stretch"):
         if initialize_agents():
-            agent = st.session_state.get(agent_key)
-            if agent:
-                with st.spinner(f"{name} is analyzing {symbol}..."):
-                    container = st.container()
-                    agent.print_response(
-                        f"Provide a detailed {analysis_type.lower()} for {symbol}.",
-                        stream=True,
-                        streamlit=True,
-                    )
-                st.session_state.analysis_history.append({
-                    "symbol": symbol,
-                    "timestamp": datetime.now(),
-                    "analysis_type": analysis_type,
-                    "agent": name,
-                })
+            container = st.container()
+            try:
+                if analysis_type == "Comprehensive Analysis":
+                    # Custom multi-step orchestration for 8B models to avoid tool hallucination
+                    st.info("📡 **Orchestrating agents...** (This may take 1-2 minutes)")
+                    
+                    with st.spinner("🤖 Technical Agent is analyzing chart patterns..."):
+                        tech_resp = st.session_state.technical_agent.run(f"Provide a detailed technical analysis for {symbol}.", stream=False)
+                    
+                    with st.spinner("📊 Fundamental Agent is analyzing financials..."):
+                        fund_resp = st.session_state.fundamental_agent.run(f"Provide a detailed fundamental analysis for {symbol}.", stream=False)
+                        
+                    with st.spinner("⚠️ Risk Agent is evaluating threats..."):
+                        risk_resp = st.session_state.risk_agent.run(f"Provide a risk assessment for {symbol}.", stream=False)
+                        
+                    with st.spinner("📝 Report Agent is synthesizing final investment thesis..."):
+                        combined_prompt = f"Create a comprehensive investment report for {symbol} based on these exact agent findings. Do NOT invent new data.\n\n"
+                        combined_prompt += f"--- TECHNICAL ANALYSIS ---\n{tech_resp.content}\n\n"
+                        combined_prompt += f"--- FUNDAMENTAL ANALYSIS ---\n{fund_resp.content}\n\n"
+                        combined_prompt += f"--- RISK ASSESSMENT ---\n{risk_resp.content}"
+                        
+                        final_resp = st.session_state.report_agent.run(combined_prompt, stream=False)
+                        
+                    if final_resp and final_resp.content:
+                        st.session_state.current_analysis_output = final_resp.content
+                        st.session_state.current_analysis_symbol = symbol
+                        st.rerun()
+                        
+                else:
+                    # Normal single-agent execution
+                    agent = st.session_state.get(agent_key)
+                    if agent:
+                        with st.spinner(f"{name} is analyzing {symbol}..."):
+                            # Using phi's stream=False avoids printing intermediate tool logs when run via st.session_state
+                            response = agent.run(
+                                f"Provide a detailed {analysis_type.lower()} for {symbol}.",
+                                stream=False,
+                            )
+                            if response and response.content:
+                                st.session_state.current_analysis_output = response.content
+                                st.session_state.current_analysis_symbol = symbol
+                                st.rerun()
+
+            except Exception as e:
+                st.error(f"⚠️ AI analysis failed: {e}")
+                
+            st.session_state.analysis_history.append({
+                "symbol": symbol,
+                "timestamp": datetime.now(),
+                "analysis_type": analysis_type,
+                "agent": name if analysis_type != "Comprehensive Analysis" else "Agent Swarm",
+            })
 
     # Quick-fire agent buttons
     st.markdown("---")
     st.markdown("### ⚡ Quick Agent Actions")
     qc1, qc2, qc3 = st.columns(3)
+    
+    # Placeholder for the quick action output so it expands full width
+    quick_action_container = st.empty()
+    
     with qc1:
         if st.button("⚠️ Risk Check", key="quick_risk", width="stretch"):
             if initialize_agents():
                 with st.spinner("Risk Assessment Agent working..."):
-                    container = st.container()
-                    st.session_state.risk_agent.print_response(
-                        f"Quick risk assessment for {symbol}: top 3 risks, risk score 1-10, near-term catalysts.",
-                        stream=True,
-                        streamlit=True,
-                    )
+                    try:
+                        response = st.session_state.risk_agent.run(
+                            f"Quick risk assessment for {symbol}: top 3 risks, risk score 1-10, near-term catalysts.",
+                            stream=False,
+                        )
+                        if response and response.content:
+                            with quick_action_container.container():
+                                st.markdown("#### ⚠️ Risk Check Results")
+                                st.markdown(response.content)
+                    except Exception as e:
+                        quick_action_container.error(f"⚠️ AI analysis failed: {e}")
     with qc2:
         if st.button("🏭 Sector View", key="quick_sector", width="stretch"):
             if initialize_agents():
                 with st.spinner("Sector & Industry Agent working..."):
-                    container = st.container()
-                    st.session_state.sector_agent.print_response(
-                        f"Analyze the sector and competitive position of {symbol}.",
-                        stream=True,
-                        streamlit=True,
-                    )
+                    try:
+                        response = st.session_state.sector_agent.run(
+                            f"Analyze the sector and competitive position of {symbol}.",
+                            stream=False,
+                        )
+                        if response and response.content:
+                            with quick_action_container.container():
+                                st.markdown("#### 🏭 Sector View Results")
+                                st.markdown(response.content)
+                    except Exception as e:
+                        quick_action_container.error(f"⚠️ AI analysis failed: {e}")
     with qc3:
         if st.button("🔄 Peer Compare", key="quick_compare", width="stretch"):
             if initialize_agents():
                 with st.spinner("Stock Comparison Agent working..."):
-                    container = st.container()
-                    st.session_state.comparison_agent.print_response(
-                        f"Compare {symbol} against its top 3 sector peers on valuation, growth, and performance.",
-                        stream=True,
-                        streamlit=True,
-                    )
-
+                    try:
+                        response = st.session_state.comparison_agent.run(
+                            f"Compare {symbol} against its top 3 sector peers on valuation, growth, and performance.",
+                            stream=False,
+                        )
+                        if response and response.content:
+                            with quick_action_container.container():
+                                st.markdown("#### 🔄 Peer Compare Results")
+                                st.markdown(response.content)
+                    except Exception as e:
+                        quick_action_container.error(f"⚠️ AI analysis failed: {e}")
     # RAG Query Section
     st.markdown("---")
     st.markdown("### 💬 Ask Any Agent a Question")
@@ -463,12 +524,17 @@ def tab_analysis(symbol, analysis_type, doc_store):
 
             with st.spinner(f"{agent_names.get(target_key, ('Agent',))[0]} is thinking..."):
                 container = st.container()
-                target_agent.print_response(full_query, stream=True, streamlit=True)
+                try:
+                    response = target_agent.run(full_query, stream=False)
+                    if response and response.content:
+                        container.markdown(response.content)
+                except Exception as e:
+                    st.error(f"⚠️ AI analysis failed: {e}")
 
 
 # ═══════════════════════════════ Tab: Sentiment ═══════════════════════════════
 
-def tab_sentiment(symbol, company_name, dark_mode, doc_store):
+def tab_sentiment(symbol, company_name, doc_store):
     st.markdown("### 🧠 Social Sentiment Analysis")
     st.caption("Powered by VADER (speed) + FinBERT (finance accuracy) — both open-source")
 
@@ -520,15 +586,15 @@ def tab_sentiment(symbol, company_name, dark_mode, doc_store):
         # Charts
         c1, c2 = st.columns(2)
         with c1:
-            st.plotly_chart(create_sentiment_gauge(summary["avg_score"], dark_mode))
+            st.plotly_chart(create_sentiment_gauge(summary["avg_score"], False))
         with c2:
-            st.plotly_chart(create_sentiment_pie(summary, dark_mode))
+            st.plotly_chart(create_sentiment_pie(summary, False))
 
         c3, c4 = st.columns(2)
         with c3:
-            st.plotly_chart(create_sentiment_timeline(analyzed, dark_mode))
+            st.plotly_chart(create_sentiment_timeline(analyzed, False))
         with c4:
-            st.plotly_chart(create_source_comparison(analyzed, dark_mode))
+            st.plotly_chart(create_source_comparison(analyzed, False))
 
         # Word cloud (text-based fallback if wordcloud lib not available)
         st.markdown("### ☁️ Key Discussion Topics")
@@ -540,7 +606,7 @@ def tab_sentiment(symbol, company_name, dark_mode, doc_store):
 
                 wc = WordCloud(
                     width=800, height=300,
-                    background_color="black" if dark_mode else "white",
+                    background_color="white",
                     colormap="cool",
                     max_words=60,
                 ).generate_from_frequencies(word_freq)
@@ -563,7 +629,7 @@ def tab_sentiment(symbol, company_name, dark_mode, doc_store):
         if st.button("Let AI interpret the sentiment data", key="ai_sentiment_interpret"):
             if initialize_agents():
                 with st.spinner("Sentiment Intelligence Agent is analyzing social data..."):
-                    sentiment_summary = (
+                    sentiment_prompt = (
                         f"Analyze the social sentiment for {symbol} ({company_name}). "
                         f"Data: {summary['total']} posts analyzed — "
                         f"{summary['positive_pct']}% positive, {summary['negative_pct']}% negative, "
@@ -571,9 +637,14 @@ def tab_sentiment(symbol, company_name, dark_mode, doc_store):
                         f"Interpret this sentiment data, identify risks, and predict potential price impact."
                     )
                     container = st.container()
-                    st.session_state.sentiment_agent.print_response(
-                        sentiment_summary, stream=True, streamlit=True,
-                    )
+                    try:
+                        response = st.session_state.sentiment_agent.run(
+                            sentiment_prompt, stream=False,
+                        )
+                        if response and response.content:
+                            container.markdown(response.content)
+                    except Exception as e:
+                        st.error(f"⚠️ AI analysis failed: {e}")
 
 
 # ═══════════════════════════════ Tab: News ═══════════════════════════════
@@ -607,12 +678,16 @@ def tab_news(info, symbol):
         if initialize_agents():
             with st.spinner("News Curator Agent is finding and analyzing news..."):
                 container = st.container()
-                st.session_state.news_agent.print_response(
-                    f"Find and analyze the latest news for {symbol} ({info.get('shortName', '')})."
-                    f" Categorize by type, rate market impact, and summarize overall news sentiment.",
-                    stream=True,
-                    streamlit=True,
-                )
+                try:
+                    response = st.session_state.news_agent.run(
+                        f"Find and analyze the latest news for {symbol} ({info.get('shortName', '')})."
+                        f" Categorize by type, rate market impact, and summarize overall news sentiment.",
+                        stream=False,
+                    )
+                    if response and response.content:
+                        container.markdown(response.content)
+                except Exception as e:
+                    st.error(f"⚠️ AI news analysis failed: {e}")
 
 
 # ═══════════════════════════════ Main ═══════════════════════════════
@@ -620,7 +695,7 @@ def tab_news(info, symbol):
 def main():
     init_session_state()
     analysis_type, market = render_sidebar()
-    inject_css(st.session_state.dark_mode)
+    inject_css()
 
     # Hero
     st.markdown(f'<div class="hero-header">{APP_ICON} {APP_TITLE}</div>', unsafe_allow_html=True)
@@ -682,7 +757,6 @@ def main():
     symbol = st.session_state.current_symbol
     info = st.session_state.current_info
     hist = st.session_state.current_hist
-    dark_mode = st.session_state.dark_mode
     doc_store = st.session_state.doc_store
 
     # Market status
@@ -701,12 +775,12 @@ def main():
     with tab1:
         tab_overview(info, hist)
     with tab2:
-        tab_charts(hist, symbol, dark_mode)
+        tab_charts(hist, symbol)
     with tab3:
         tab_analysis(symbol, analysis_type, doc_store)
     with tab4:
         company_name = info.get("shortName", info.get("longName", ""))
-        tab_sentiment(symbol, company_name, dark_mode, doc_store)
+        tab_sentiment(symbol, company_name, doc_store)
     with tab5:
         tab_news(info, symbol)
 

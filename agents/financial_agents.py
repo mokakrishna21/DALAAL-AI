@@ -70,7 +70,7 @@ def _create_market_data_agent() -> Agent:
             "If data is unavailable, state 'Data not available'.",
             "CRITICAL: Pass numerical parameters (like num_stories) as integers, NOT strings.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -93,7 +93,7 @@ def _create_web_search_agent() -> Agent:
             "Prioritize: earnings reports, analyst upgrades/downgrades, regulatory news, M&A activity.",
             "Flag any breaking news or market-moving events prominently.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -117,7 +117,7 @@ def _create_news_agent() -> Agent:
             "Summarize news sentiment: Bullish / Bearish / Mixed.",
             "CRITICAL: Pass numerical parameters (like num_stories) as integers, NOT strings.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -145,7 +145,7 @@ def _create_technical_analysis_agent() -> Agent:
             "Include timeframe for your analysis (short-term, medium-term, long-term).",
             "Warn about any conflicting signals between indicators.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -176,7 +176,7 @@ def _create_fundamental_analysis_agent() -> Agent:
             "Determine if the stock is: Undervalued / Fairly Valued / Overvalued.",
             "Highlight any red flags in the financial statements.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -204,7 +204,7 @@ def _create_risk_assessment_agent() -> Agent:
             "Suggest hedging strategies for identified risks.",
             "Flag any near-term risk catalysts (earnings, FDA decisions, lawsuits, etc.).",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -232,7 +232,7 @@ def _create_sentiment_analysis_agent() -> Agent:
             "Flag potential sentiment-driven events (meme stock activity, short squeeze setups).",
             "Note if sentiment is leading or lagging the price action.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -262,7 +262,7 @@ def _create_institutional_agent() -> Agent:
             "Highlight any unusual institutional activity that could signal upcoming moves.",
             "Note the ownership concentration — is it widely held or controlled by a few?",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -295,7 +295,7 @@ def _create_comparison_agent() -> Agent:
             "Present results in a clear comparison table.",
             "Conclude with positioning recommendation: which peer looks most attractive and why.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -321,21 +321,23 @@ def _create_sector_industry_agent() -> Agent:
             "6. FUTURE OUTLOOK: 1-year and 3-year sector outlook with catalysts.",
             "Use recent data and cite sources for your sector analysis.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
 
-def _create_report_generator_agent(team: list[Agent]) -> Agent:
+def _create_report_generator_agent() -> Agent:
     """Agent #11: Report Generator Agent — synthesizes all agent outputs into a report."""
     return Agent(
         name="Report Generator Agent",
         role="Synthesize analysis from all specialist agents into a comprehensive investment report",
         model=_get_model(),
-        team=team,
         instructions=[
             "You are a senior investment analyst creating a comprehensive stock report.",
-            "Compile insights from ALL team members into a structured report with these sections:",
+            "Compile the provided insights into a structured report with these sections:",
+            "",
+            "CRITICAL: You are a REPORT WRITER only.",
+            "DO NOT attempt to use tools or functions. Simply synthesize the provided text.",
             "",
             "## Executive Summary",
             "One-paragraph verdict: Buy / Hold / Sell — with conviction level (High/Medium/Low).",
@@ -367,7 +369,7 @@ def _create_report_generator_agent(team: list[Agent]) -> Agent:
             "Be data-driven. Cite specific numbers. Avoid generic statements.",
             "If agents disagree, highlight the divergence and explain why.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -383,9 +385,23 @@ def _create_master_orchestrator(team: list[Agent]) -> Agent:
         role="Intelligent query router that delegates to specialized financial agents",
         model=_get_model(),
         team=team,
+        tools=[
+            DuckDuckGo(fixed_max_results=3),
+            YFinanceTools(
+                stock_price=True,
+                company_info=True,
+                analyst_recommendations=True,
+                company_news=True,
+            ),
+        ],
         instructions=[
             "You are the DALAAL AI Master Orchestrator — a superintelligent financial AI.",
             "You lead a team of specialized agents. Route each query to the MOST relevant agents.",
+            "",
+            "IMPORTANT: You have DuckDuckGo and YFinance tools available.",
+            "Use ONLY the tools provided to you. NEVER call tools that are not in your tool list.",
+            "Do NOT call brave_search, google_search, or any other tool not listed above.",
+            "If you need web search, use duckduckgo_search. If you need stock data, use yfinance tools.",
             "",
             "ROUTING RULES:",
             "- Technical questions → Technical Analysis Agent",
@@ -403,7 +419,7 @@ def _create_master_orchestrator(team: list[Agent]) -> Agent:
             "Highlight any CONFLICTS between agents' conclusions.",
             "End every response with a clear, actionable summary.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         markdown=True,
     )
 
@@ -489,8 +505,8 @@ def initialize_agents() -> bool:
             comparison_agent, sector_agent,
         ]
 
-        # Report Generator (has the full team)
-        report_agent = _create_report_generator_agent(all_specialists)
+        # Report Generator (no longer has tools/team to prevent hallucination on 8B model)
+        report_agent = _create_report_generator_agent()
 
         # Master Orchestrator (routes to all agents including report generator)
         master = _create_master_orchestrator(all_specialists + [report_agent])

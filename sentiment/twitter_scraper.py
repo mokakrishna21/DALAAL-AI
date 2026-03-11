@@ -1,100 +1,120 @@
-# sentiment/twitter_scraper.py — Twitter/X post scraper (open-source, no API key)
+# sentiment/twitter_scraper.py — Twitter/X & Web discussion scraper
+# Uses DuckDuckGo news + text search for stock discussions
+# (Direct Twitter API scraping is no longer viable without paid API access)
 
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 def scrape_twitter(query: str, limit: int = 30) -> list[dict]:
-    """Scrape tweets about a stock using open-source tools.
+    """Find stock discussions from Twitter/X, news, and the web using DuckDuckGo.
 
-    Tries in order:
-    1. snscrape (most reliable, scrapes public tweets without API)
-    2. Nitter fallback via ntscraper
-    3. Web search fallback (DuckDuckGo)
+    Direct Twitter scraping (snscrape, ntscraper) no longer works reliably
+    since Twitter/X blocked public scraping in 2023. This uses DuckDuckGo
+    news and text search to find recent stock discussions and sentiment.
 
     Returns list of dicts: {text, author, likes, timestamp, url, source}
     """
-    # 1) Try snscrape
-    posts = _try_snscrape(query, limit)
-    if posts:
-        return posts
+    posts = []
 
-    # 2) Try ntscraper (Nitter)
-    posts = _try_ntscraper(query, limit)
-    if posts:
-        return posts
+    # 1. News search — most reliable for financial content
+    posts.extend(_search_news(query, limit))
 
-    # 3) Web search fallback
-    return _web_search_fallback(query, limit)
+    # 2. Text search for Twitter/forum discussions (supplement)
+    remaining = limit - len(posts)
+    if remaining > 0:
+        posts.extend(_search_text(query, remaining))
 
-
-def _try_snscrape(query: str, limit: int) -> list[dict]:
-    """Scrape tweets using snscrape (open-source, no API key needed)."""
-    try:
-        import snscrape.modules.twitter as sntwitter
-
-        search_query = f"{query} stock lang:en since:{(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')}"
-        posts = []
-
-        for i, tweet in enumerate(sntwitter.TwitterSearchScraper(search_query).get_items()):
-            if i >= limit:
-                break
-            posts.append({
-                "text": tweet.rawContent,
-                "author": tweet.user.username if tweet.user else "Unknown",
-                "likes": tweet.likeCount or 0,
-                "timestamp": tweet.date.isoformat() if tweet.date else "",
-                "url": tweet.url or "",
-                "source": "twitter",
-            })
-
-        return posts
-    except Exception:
-        return []
+    return posts
 
 
-def _try_ntscraper(query: str, limit: int) -> list[dict]:
-    """Scrape tweets using ntscraper (Nitter instances, open-source)."""
-    try:
-        from ntscraper import Nitter
-
-        scraper = Nitter()
-        results = scraper.get_tweets(query, mode="term", number=limit)
-
-        posts = []
-        for tweet in results.get("tweets", []):
-            posts.append({
-                "text": tweet.get("text", ""),
-                "author": tweet.get("user", {}).get("username", "Unknown"),
-                "likes": tweet.get("stats", {}).get("likes", 0),
-                "timestamp": tweet.get("date", ""),
-                "url": tweet.get("link", ""),
-                "source": "twitter/nitter",
-            })
-        return posts
-    except Exception:
-        return []
-
-
-def _web_search_fallback(query: str, limit: int) -> list[dict]:
-    """Fallback: find stock discussions via DuckDuckGo when Twitter scraping fails."""
+def _search_news(query: str, limit: int) -> list[dict]:
+    """Search for recent stock news via DuckDuckGo news endpoint."""
     try:
         from duckduckgo_search import DDGS
 
-        search_term = f"{query} stock market discussion twitter"
-        posts = []
+        # Clean query for better search results
+        clean_query = query.replace(".NS", "").replace(".BO", "")
+        search_term = f"{clean_query} stock share price market"
 
+        posts = []
         with DDGS() as ddgs:
-            results = ddgs.text(search_term, max_results=limit)
+            results = list(ddgs.news(search_term, max_results=limit))
             for r in results:
+                title = r.get("title", "")
+                body = r.get("body", "")
+                text = f"{title}. {body}" if body else title
+
+                if not text.strip():
+                    continue
+
                 posts.append({
-                    "text": f"{r.get('title', '')}. {r.get('body', '')}",
-                    "author": "Web Source",
+                    "text": text,
+                    "author": r.get("source", "News"),
+                    "likes": 0,
+                    "timestamp": r.get("date", datetime.now().isoformat()),
+                    "url": r.get("url", ""),
+                    "source": "twitter",  # labeled twitter for compatibility with analyzer
+                })
+        return posts
+
+    except Exception as e:
+        st.warning(f"⚠️ News search failed: {e}")
+        return []
+
+
+def _search_text(query: str, limit: int) -> list[dict]:
+    """Search for stock discussions via DuckDuckGo text search."""
+    if limit <= 0:
+        return []
+
+    try:
+        from duckduckgo_search import DDGS
+
+        clean_query = query.replace(".NS", "").replace(".BO", "")
+        search_term = f"{clean_query} stock opinion analysis buy sell hold"
+
+        posts = []
+        with DDGS() as ddgs:
+            results = list(ddgs.text(search_term, max_results=limit))
+            for r in results:
+                title = r.get("title", "")
+                body = r.get("body", "")
+                text = f"{title}. {body}" if body else title
+
+                if not text.strip():
+                    continue
+
+                posts.append({
+                    "text": text,
+                    "author": _extract_source(r.get("href", "")),
                     "likes": 0,
                     "timestamp": datetime.now().isoformat(),
                     "url": r.get("href", ""),
-                    "source": "web_search",
+                    "source": "twitter",  # labeled twitter for compatibility
                 })
         return posts
+
     except Exception:
         return []
+
+
+def _extract_source(url: str) -> str:
+    """Extract a readable source name from URL."""
+    if "twitter.com" in url or "x.com" in url:
+        parts = url.replace("https://", "").replace("http://", "").split("/")
+        if len(parts) >= 2 and parts[1] not in ("search", "hashtag", "i"):
+            return f"@{parts[1]}"
+    if "stocktwits.com" in url:
+        return "StockTwits"
+    if "reddit.com" in url:
+        return "Reddit"
+    if "moneycontrol.com" in url:
+        return "MoneyControl"
+    if "economictimes" in url:
+        return "Economic Times"
+    if "livemint.com" in url:
+        return "LiveMint"
+    if "yahoo.com" in url:
+        return "Yahoo Finance"
+    return "Web Source"
