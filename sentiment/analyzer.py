@@ -74,7 +74,7 @@ def _vader_batch(texts: list[str]) -> list[float]:
 
 # ──────────────────────── FinBERT (via HuggingFace Inference API) ────────────────────────
 
-FINBERT_API_URL = "https://api-inference.huggingface.co/models/ProsusAI/finbert"
+FINBERT_API_URL = "https://router.huggingface.co/hf-inference/models/ProsusAI/finbert"
 
 
 def _get_hf_api_key() -> str:
@@ -86,15 +86,48 @@ def _get_hf_api_key() -> str:
         return os.environ.get("HF_API_KEY", "")
 
 
-def _finbert_batch(texts: list[str], batch_size: int = 10) -> list[dict]:
-    """Run FinBERT via HuggingFace Inference API (no local model needed).
+@st.cache_resource(show_spinner="Loading FinBERT model...")
+def _load_finbert_local():
+    """Load FinBERT locally using transformers. This is more reliable than the API."""
+    try:
+        from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+        model_name = "ProsusAI/finbert"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # We explicitly omit the revision parameter as requested
+        model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        return pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+    except Exception as e:
+        st.warning(f"Could not load local FinBERT (falling back to API): {e}")
+        return None
 
-    Uses the free HF Inference API — runs on HuggingFace servers.
-    Returns list of {score, label} dicts.
+
+def _finbert_batch(texts: list[str], batch_size: int = 10) -> list[dict]:
+    """Run FinBERT sentiment analysis. 
+    Tries local model first, then falls back to HF Inference API.
     """
+    # 1. Try Local Model first
+    local_pipeline = _load_finbert_local()
+    if local_pipeline:
+        try:
+            # Pipeline handles batches well
+            results = []
+            for i in range(0, len(texts), batch_size):
+                batch = [t[:512] for t in texts[i : i + batch_size]]
+                raw_results = local_pipeline(batch)
+                for item in raw_results:
+                    results.append({
+                        "score": item.get("score", 0.0),
+                        "label": item.get("label", "neutral").lower()
+                    })
+            return results
+        except Exception as e:
+            st.warning(f"Local FinBERT execution failed: {e}. Trying API...")
+
+    # 2. Fallback to API if local fails or is unavailable
     api_key = _get_hf_api_key()
     if not api_key:
-        st.warning("🔑 HuggingFace API key not set. Add `HF_API_KEY` to secrets for FinBERT sentiment.")
+        if not local_pipeline:
+            st.warning("🔑 HuggingFace API key not set and local model failed. Add `HF_API_KEY` to secrets.")
         return [{"score": 0.0, "label": "neutral"}] * len(texts)
 
     import requests
@@ -104,7 +137,7 @@ def _finbert_batch(texts: list[str], batch_size: int = 10) -> list[dict]:
     results = []
 
     for i in range(0, len(texts), batch_size):
-        batch = [t[:512] for t in texts[i : i + batch_size]]  # Truncate to ~512 chars
+        batch = [t[:512] for t in texts[i : i + batch_size]]
 
         for attempt in range(3):
             try:

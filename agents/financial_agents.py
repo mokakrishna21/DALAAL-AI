@@ -105,8 +105,7 @@ def _create_news_agent() -> Agent:
         role="Curate, filter, and analyze financial news for relevance and impact",
         model=_get_model(),
         tools=[
-            DuckDuckGo(fixed_max_results=3),
-            GoogleSearch(fixed_language="english", fixed_max_results=2),
+            DuckDuckGo(fixed_max_results=2),
             YFinanceTools(company_news=True),
         ],
         instructions=[

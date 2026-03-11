@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import importlib
+import re
 import config
 
 from config import APP_TITLE, APP_ICON, PERIOD_MAP
@@ -12,6 +13,20 @@ from data.market_data import (
     get_symbol_from_name, get_stock_data,
     get_institutional_holders, format_large_number,
 )
+
+def clean_agent_output(text: str) -> str:
+    """Removes leaked raw tool calls or <function> tags from the LLM output."""
+    if not text:
+        return text
+    # Remove <function=...>...</function> block
+    text = re.sub(r'<function.*?</function>', '', text, flags=re.DOTALL)
+    # Remove loose lines starting with <function or Function=
+    text = re.sub(r'(?i)^\s*\*?\s*<?function=.*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'(?i)^\s*\*?\s*<?function>.*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'(?i)^\s*Function=.*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'Running:.*$', '', text, flags=re.MULTILINE)
+    return text.strip()
+
 from charts.technical import (
     create_price_chart, create_volume_chart,
     create_rsi_chart, create_macd_chart,
@@ -129,7 +144,7 @@ def inject_css():
 def init_session_state():
     # CACHE BUSTER: Increment this when changing agent configurations 
     # to force long-running Streamlit sessions to recreate them
-    CACHE_VERSION = 6
+    CACHE_VERSION = 8
     if st.session_state.get("cache_version") != CACHE_VERSION:
         st.session_state.clear()
         st.session_state["cache_version"] = CACHE_VERSION
@@ -307,7 +322,7 @@ def tab_overview(info, hist):
                         stream=False,
                     )
                     if response and response.content:
-                        container.markdown(response.content)
+                        container.markdown(clean_agent_output(response.content))
                 except Exception as e:
                     st.error(f"⚠️ AI analysis failed: {e}")
 
@@ -360,7 +375,7 @@ def tab_charts(hist, symbol):
                         stream=False,
                     )
                     if response and response.content:
-                        container.markdown(response.content)
+                        container.markdown(clean_agent_output(response.content))
                 except Exception as e:
                     st.error(f"⚠️ AI analysis failed: {e}")
 
@@ -412,14 +427,14 @@ def tab_analysis(symbol, analysis_type, doc_store):
                         
                     with st.spinner("📝 Report Agent is synthesizing final investment thesis..."):
                         combined_prompt = f"Create a comprehensive investment report for {symbol} based on these exact agent findings. Do NOT invent new data.\n\n"
-                        combined_prompt += f"--- TECHNICAL ANALYSIS ---\n{tech_resp.content}\n\n"
-                        combined_prompt += f"--- FUNDAMENTAL ANALYSIS ---\n{fund_resp.content}\n\n"
-                        combined_prompt += f"--- RISK ASSESSMENT ---\n{risk_resp.content}"
+                        combined_prompt += f"--- TECHNICAL ANALYSIS ---\n{clean_agent_output(tech_resp.content)}\n\n"
+                        combined_prompt += f"--- FUNDAMENTAL ANALYSIS ---\n{clean_agent_output(fund_resp.content)}\n\n"
+                        combined_prompt += f"--- RISK ASSESSMENT ---\n{clean_agent_output(risk_resp.content)}"
                         
                         final_resp = st.session_state.report_agent.run(combined_prompt, stream=False)
                         
                     if final_resp and final_resp.content:
-                        st.session_state.current_analysis_output = final_resp.content
+                        st.session_state.current_analysis_output = clean_agent_output(final_resp.content)
                         st.session_state.current_analysis_symbol = symbol
                         st.rerun()
                         
@@ -434,7 +449,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
                                 stream=False,
                             )
                             if response and response.content:
-                                st.session_state.current_analysis_output = response.content
+                                st.session_state.current_analysis_output = clean_agent_output(response.content)
                                 st.session_state.current_analysis_symbol = symbol
                                 st.rerun()
 
@@ -474,7 +489,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
                             stream=False,
                         )
                         if response and response.content:
-                            st.session_state.quick_risk_output = response.content
+                            st.session_state.quick_risk_output = clean_agent_output(response.content)
                             st.session_state.quick_risk_symbol = symbol
                             st.rerun()
                     except Exception as e:
@@ -489,7 +504,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
                             stream=False,
                         )
                         if response and response.content:
-                            st.session_state.quick_sector_output = response.content
+                            st.session_state.quick_sector_output = clean_agent_output(response.content)
                             st.session_state.quick_sector_symbol = symbol
                             st.rerun()
                     except Exception as e:
@@ -504,7 +519,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
                             stream=False,
                         )
                         if response and response.content:
-                            st.session_state.quick_compare_output = response.content
+                            st.session_state.quick_compare_output = clean_agent_output(response.content)
                             st.session_state.quick_compare_symbol = symbol
                             st.rerun()
                     except Exception as e:
@@ -541,7 +556,7 @@ def tab_analysis(symbol, analysis_type, doc_store):
                 try:
                     response = target_agent.run(full_query, stream=False)
                     if response and response.content:
-                        st.session_state.custom_query_output = response.content
+                        st.session_state.custom_query_output = clean_agent_output(response.content)
                         st.session_state.custom_query_symbol = symbol
                         st.rerun()
                 except Exception as e:
@@ -664,7 +679,7 @@ def tab_sentiment(symbol, company_name, doc_store):
                             sentiment_prompt, stream=False,
                         )
                         if response and response.content:
-                            container.markdown(response.content)
+                            container.markdown(clean_agent_output(response.content))
                     except Exception as e:
                         st.error(f"⚠️ AI analysis failed: {e}")
 
@@ -673,7 +688,7 @@ def tab_sentiment(symbol, company_name, doc_store):
 
 def tab_news(info, symbol):
     st.markdown("### 📰 Latest News")
-    news = info.get("news") or info.get("companyOfficers", [])  # yfinance structure varies
+    news = info.get("news", [])
 
     if isinstance(news, list) and news:
         for item in news[:8]:
@@ -707,7 +722,7 @@ def tab_news(info, symbol):
                         stream=False,
                     )
                     if response and response.content:
-                        container.markdown(response.content)
+                        container.markdown(clean_agent_output(response.content))
                 except Exception as e:
                     st.error(f"⚠️ AI news analysis failed: {e}")
 
