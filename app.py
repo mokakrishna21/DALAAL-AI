@@ -129,7 +129,7 @@ def inject_css():
 def init_session_state():
     # CACHE BUSTER: Increment this when changing agent configurations 
     # to force long-running Streamlit sessions to recreate them
-    CACHE_VERSION = 4
+    CACHE_VERSION = 5
     if st.session_state.get("cache_version") != CACHE_VERSION:
         st.session_state.clear()
         st.session_state["cache_version"] = CACHE_VERSION
