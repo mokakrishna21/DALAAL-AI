@@ -132,9 +132,6 @@ def _create_technical_analysis_agent() -> Agent:
         name="Technical Analysis Agent",
         role="Expert technical analyst interpreting chart patterns, indicators, and price action",
         model=_get_model(),
-        tools=[
-            YFinanceTools(stock_price=True, historical_prices=True),
-        ],
         instructions=[
             "You are a senior technical analyst with 20 years of experience.",
             "Analyze the stock using these indicators: RSI, MACD, Bollinger Bands, Moving Averages (20/50/200), Volume, Stochastic.",
