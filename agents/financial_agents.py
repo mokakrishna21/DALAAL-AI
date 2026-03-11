@@ -184,10 +184,6 @@ def _create_risk_assessment_agent() -> Agent:
         name="Risk Assessment Agent",
         role="Risk specialist evaluating investment risks across multiple dimensions",
         model=_get_model(),
-        tools=[
-            YFinanceTools(stock_price=True, stock_fundamentals=True, company_info=True),
-            DuckDuckGo(fixed_max_results=3),
-        ],
         instructions=[
             "You are a risk management specialist.",
             "Evaluate the stock across these risk categories:",
