@@ -76,7 +76,7 @@ def create_rag_agent(doc_store: DocumentStore) -> Optional[Agent]:
                 "Structure your response as: Overall Mood → Key Themes → Notable Posts → Risk Signals.",
                 "If sentiment data is limited, say so clearly rather than guessing.",
             ],
-            show_tool_calls=True,
+            show_tool_calls=False,
             markdown=True,
         )
         return agent
