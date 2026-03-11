@@ -129,7 +129,7 @@ def inject_css():
 def init_session_state():
     # CACHE BUSTER: Increment this when changing agent configurations 
     # to force long-running Streamlit sessions to recreate them
-    CACHE_VERSION = 5
+    CACHE_VERSION = 6
     if st.session_state.get("cache_version") != CACHE_VERSION:
         st.session_state.clear()
         st.session_state["cache_version"] = CACHE_VERSION
@@ -453,11 +453,19 @@ def tab_analysis(symbol, analysis_type, doc_store):
     st.markdown("### ⚡ Quick Agent Actions")
     qc1, qc2, qc3 = st.columns(3)
     
-    # Placeholder for the quick action output so it expands full width
-    quick_action_container = st.empty()
+    # Render cached quick actions if they exist for the current symbol
+    for key, title in [
+        ("quick_risk", "⚠️ Risk Check Results"),
+        ("quick_sector", "🏭 Sector View Results"),
+        ("quick_compare", "🔄 Peer Compare Results")
+    ]:
+        if f"{key}_output" in st.session_state and st.session_state.get(f"{key}_symbol") == symbol:
+            with st.container(border=True):
+                st.markdown(f"#### {title}")
+                st.markdown(st.session_state[f"{key}_output"])
     
     with qc1:
-        if st.button("⚠️ Risk Check", key="quick_risk", width="stretch"):
+        if st.button("⚠️ Risk Check", key="quick_risk_btn", width="stretch"):
             if initialize_agents():
                 with st.spinner("Risk Assessment Agent working..."):
                     try:
@@ -466,13 +474,13 @@ def tab_analysis(symbol, analysis_type, doc_store):
                             stream=False,
                         )
                         if response and response.content:
-                            with quick_action_container.container():
-                                st.markdown("#### ⚠️ Risk Check Results")
-                                st.markdown(response.content)
+                            st.session_state.quick_risk_output = response.content
+                            st.session_state.quick_risk_symbol = symbol
+                            st.rerun()
                     except Exception as e:
-                        quick_action_container.error(f"⚠️ AI analysis failed: {e}")
+                        st.error(f"⚠️ AI analysis failed: {e}")
     with qc2:
-        if st.button("🏭 Sector View", key="quick_sector", width="stretch"):
+        if st.button("🏭 Sector View", key="quick_sector_btn", width="stretch"):
             if initialize_agents():
                 with st.spinner("Sector & Industry Agent working..."):
                     try:
@@ -481,13 +489,13 @@ def tab_analysis(symbol, analysis_type, doc_store):
                             stream=False,
                         )
                         if response and response.content:
-                            with quick_action_container.container():
-                                st.markdown("#### 🏭 Sector View Results")
-                                st.markdown(response.content)
+                            st.session_state.quick_sector_output = response.content
+                            st.session_state.quick_sector_symbol = symbol
+                            st.rerun()
                     except Exception as e:
-                        quick_action_container.error(f"⚠️ AI analysis failed: {e}")
+                        st.error(f"⚠️ AI analysis failed: {e}")
     with qc3:
-        if st.button("🔄 Peer Compare", key="quick_compare", width="stretch"):
+        if st.button("🔄 Peer Compare", key="quick_compare_btn", width="stretch"):
             if initialize_agents():
                 with st.spinner("Stock Comparison Agent working..."):
                     try:
@@ -496,11 +504,11 @@ def tab_analysis(symbol, analysis_type, doc_store):
                             stream=False,
                         )
                         if response and response.content:
-                            with quick_action_container.container():
-                                st.markdown("#### 🔄 Peer Compare Results")
-                                st.markdown(response.content)
+                            st.session_state.quick_compare_output = response.content
+                            st.session_state.quick_compare_symbol = symbol
+                            st.rerun()
                     except Exception as e:
-                        quick_action_container.error(f"⚠️ AI analysis failed: {e}")
+                        st.error(f"⚠️ AI analysis failed: {e}")
     # RAG Query Section
     st.markdown("---")
     st.markdown("### 💬 Ask Any Agent a Question")
@@ -530,13 +538,20 @@ def tab_analysis(symbol, analysis_type, doc_store):
                 )
 
             with st.spinner(f"{agent_names.get(target_key, ('Agent',))[0]} is thinking..."):
-                container = st.container()
                 try:
                     response = target_agent.run(full_query, stream=False)
                     if response and response.content:
-                        container.markdown(response.content)
+                        st.session_state.custom_query_output = response.content
+                        st.session_state.custom_query_symbol = symbol
+                        st.rerun()
                 except Exception as e:
                     st.error(f"⚠️ AI analysis failed: {e}")
+                    
+    # Display cached custom query
+    if "custom_query_output" in st.session_state and st.session_state.get("custom_query_symbol") == symbol:
+        with st.container(border=True):
+            st.markdown("#### 💬 AI Response")
+            st.markdown(st.session_state.custom_query_output)
 
 
 # ═══════════════════════════════ Tab: Sentiment ═══════════════════════════════
