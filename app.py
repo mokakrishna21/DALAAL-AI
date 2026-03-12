@@ -25,6 +25,9 @@ def clean_agent_output(text: str) -> str:
     text = re.sub(r'(?i)^\s*\*?\s*<?function>.*$', '', text, flags=re.MULTILINE)
     text = re.sub(r'(?i)^\s*Function=.*$', '', text, flags=re.MULTILINE)
     text = re.sub(r'Running:.*$', '', text, flags=re.MULTILINE)
+    # Remove hallucinated "Next Steps" sections often added by LLMs
+    text = re.sub(r'(?i)#*\s*Next Steps.*$', '', text, flags=re.DOTALL)
+    text = re.sub(r'(?i)#*\s*Step \d+:.*$', '', text, flags=re.MULTILINE)
     return text.strip()
 
 from charts.technical import (
@@ -144,7 +147,7 @@ def inject_css():
 def init_session_state():
     # CACHE BUSTER: Increment this when changing agent configurations 
     # to force long-running Streamlit sessions to recreate them
-    CACHE_VERSION = 9
+    CACHE_VERSION = 10
     if st.session_state.get("cache_version") != CACHE_VERSION:
         st.session_state.clear()
         st.session_state["cache_version"] = CACHE_VERSION
