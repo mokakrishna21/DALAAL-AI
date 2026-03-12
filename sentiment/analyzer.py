@@ -141,6 +141,8 @@ def _finbert_batch(texts: list[str], batch_size: int = 10) -> list[dict]:
 
         for attempt in range(3):
             try:
+                # DEBUG LOG FOR 410 ERROR
+                st.write(f"DEBUG: Hitting FinBERT URL: {FINBERT_API_URL}")
                 response = requests.post(
                     FINBERT_API_URL,
                     headers=headers,

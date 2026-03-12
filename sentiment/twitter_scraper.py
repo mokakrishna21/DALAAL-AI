@@ -33,6 +33,7 @@ def _search_news(query: str, limit: int) -> list[dict]:
     try:
         from duckduckgo_search import DDGS
 
+
         # Clean query for better search results
         clean_query = query.replace(".NS", "").replace(".BO", "")
         search_term = f"{clean_query} stock share price market"

@@ -144,7 +144,7 @@ def inject_css():
 def init_session_state():
     # CACHE BUSTER: Increment this when changing agent configurations 
     # to force long-running Streamlit sessions to recreate them
-    CACHE_VERSION = 8
+    CACHE_VERSION = 9
     if st.session_state.get("cache_version") != CACHE_VERSION:
         st.session_state.clear()
         st.session_state["cache_version"] = CACHE_VERSION
@@ -207,6 +207,28 @@ def render_sidebar():
                 del st.session_state["model_id"]
             st.success("Agents reset. They will re-initialize on next use.")
             st.rerun()
+
+        if st.button("☢️ Nuclear Deep Refresh", help="Clears all caches and force-reloads Python modules from disk. Use this if errors persist after an update."):
+            # 1. Clear all Streamlit caches
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            st.session_state.clear()
+            
+            # 2. Force reload project modules
+            try:
+                import agents.financial_agents
+                import sentiment.analyzer
+                import sentiment.twitter_scraper
+                import data.market_data
+                importlib.reload(agents.financial_agents)
+                importlib.reload(sentiment.analyzer)
+                importlib.reload(sentiment.twitter_scraper)
+                importlib.reload(data.market_data)
+                st.session_state["cache_version"] = 9 # Force re-init_session_state
+                st.success("✅ System Purged! All caches cleared and modules reloaded.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Refresh failed: {e}")
 
         if st.button("🗑️ Clear Data Cache", width="stretch"):
             st.cache_data.clear()
